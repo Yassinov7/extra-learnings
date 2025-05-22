@@ -26,7 +26,7 @@ If you are developing a production application, we recommend using TypeScript wi
 ## 🚀 بدء التشغيل محليًا
 
 ```bash
-git clone https://github.com/Yassinov7/extra-learning.git
+git clone https://github.com/Yassinov7/extra-learnings.git
 cd REPO_NAME
 npm install
 cp .env.example .env
