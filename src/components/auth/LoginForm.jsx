@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { supabase } from '../../api/supabase'; // تأكد من وجود الملف
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 
 const schema = yup.object({
@@ -63,6 +63,11 @@ export default function LoginForm() {
       >
         {loading ? '...جارٍ تسجيل الدخول' : 'تسجيل الدخول'}
       </button>
+      <Link
+            to={`/register`}
+            className="w-full py-2 bg-white text-orange hover:bg-gray-300 rounded-lg font-semibold transition"
+          >انشاء حساب جديد 
+          </Link>
     </form>
   );
 }
