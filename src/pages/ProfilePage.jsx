@@ -1,3 +1,4 @@
+// src/pages/ProfilePage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../api/supabase';
@@ -5,172 +6,203 @@ import { Camera } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, userData, setUserData } = useAuth();
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     name: '',
     email: '',
-    password: '',
+    username: '',
+    oldPassword: '',
+    newPassword: '',
     avatar_url: '',
   });
-
   const [uploading, setUploading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-  const fileInputRef = useRef();
+  const [toast, setToast] = useState('');
+  const fileRef = useRef();
 
-  useEffect(() => {
-    if (userData) {
-      setFormData({
-        name: userData.name,
-        email: userData.email,
-        password: '',
-        avatar_url: userData.avatar_url || '',
-      });
-    }
-  }, [userData]);
-
-  const handleChange = (e) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  // 1. جلب البيانات من user_profiles
+  const syncUserProfile = async () => {
+    if (!user) return;
+    const { data: profile, error: pErr } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    if (pErr) console.error(pErr);
+    const initial = profile || {};
+    setForm({
+      name: initial.name || user.email.split('@')[0],
+      email: initial.email || user.email,
+      username: initial.username || user.email.split('@')[0],
+      oldPassword: '',
+      newPassword: '',
+      avatar_url: initial.avatar_url || '',
+    });
   };
 
+  useEffect(() => { syncUserProfile(); }, [user]);
+
+  // 2. رفع الصورة (تصحيح المسار)
   const handleImageUpload = async (file) => {
-    const fileExt = file.name.split('.').pop();
-    const filePath = `avatars/${user.id}.${fileExt}`;
-
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}.${ext}`; // لا تكرار avatars/
     setUploading(true);
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, { upsert: true });
-
-    if (uploadError) {
-      alert('فشل رفع الصورة');
-      console.error(uploadError);
+    const { error: upErr } = await supabase.storage
+      .from('avatars')      // <-- bucket name
+      .upload(path, file, { upsert: true });
+    setUploading(false);
+    if (upErr) {
+      console.error(upErr);
+      setToast('❌ فشل رفع الصورة');
       return;
     }
-
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    const avatar_url = data.publicUrl;
-    setFormData(prev => ({ ...prev, avatar_url }));
-    setUploading(false);
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    setForm(f => ({ ...f, avatar_url: data.publicUrl }));
   };
 
+  // 3. حفظ التغييرات مع التحقّق من كلمة المرور القديمة
   const handleSave = async () => {
+    // إذا يريد تغيير كلمة المرور، يجب تقديم القديمة
+    if (form.newPassword && !form.oldPassword) {
+      setToast('⚠️ الرجاء إدخال كلمة المرور القديمة أولاً');
+      return;
+    }
     setSaving(true);
 
-    // تحديث البيانات في جدول user_profiles
-    const { error: updateError } = await supabase
+    // تحديث user_profiles
+    await supabase
       .from('user_profiles')
       .update({
-        name: formData.name,
-        avatar_url: formData.avatar_url,
+        name: form.name,
+        username: form.username,
+        avatar_url: form.avatar_url,
       })
       .eq('user_id', user.id);
 
-    if (updateError) {
-      alert('فشل تحديث البيانات');
-      console.error(updateError);
-      setSaving(false);
-      return;
+    // تحديث البريد
+    if (form.email !== user.email) {
+      const { error: eErr } = await supabase.auth.updateUser({ email: form.email });
+      if (eErr) console.error(eErr);
     }
 
-    // تحديث البريد الإلكتروني
-    if (formData.email !== user.email) {
-      const { error: emailError } = await supabase.auth.updateUser({
-        email: formData.email,
+    // تغيير كلمة المرور
+    if (form.newPassword) {
+      // تحقق كلمة المرور القديمة
+      const { error: authErr } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.oldPassword,
       });
-      if (emailError) {
-        alert('فشل تحديث البريد الإلكتروني');
-        console.error(emailError);
+      if (authErr) {
+        setToast('❌ كلمة المرور القديمة غير صحيحة');
+      } else {
+        const { error: pwErr } = await supabase.auth.updateUser({
+          password: form.newPassword,
+        });
+        if (pwErr) console.error(pwErr);
       }
     }
 
-    // تحديث كلمة السر
-    if (formData.password.trim()) {
-      const { error: passError } = await supabase.auth.updateUser({
-        password: formData.password,
-      });
-      if (passError) {
-        alert('فشل تحديث كلمة السر');
-        console.error(passError);
-      }
-    }
-
-    setUserData(prev => ({
-      ...prev,
-      name: formData.name,
-      avatar_url: formData.avatar_url,
-    }));
+    // جلب البيانات المحدثة
+    const { data: updated } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    setUserData(prev => ({ ...prev, ...updated }));
 
     setSaving(false);
     setShowConfirm(false);
-    setSuccessMsg('تم حفظ التغييرات بنجاح ✅');
-
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setToast('✅ تم حفظ التغييرات بنجاح');
   };
 
+  // 4. عرض الصفحة
   return (
-    <div className="min-h-screen bg-navy text-white font-noto p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">🧑‍💻 الملف الشخصي</h1>
+    <div className="min-h-screen bg-navy text-white font-noto p-6 max-w-lg mx-auto">
+      <h1 className="text-2xl font-bold mb-6">🧑‍💻 ملفي الشخصي</h1>
 
       {/* صورة الحساب */}
       <div className="relative inline-block mb-6">
         <img
           src={
-            formData.avatar_url ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name)}&background=0D8ABC&color=fff`
+            form.avatar_url ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(form.name)}&background=0D8ABC&color=fff`
           }
           alt="avatar"
-          className="w-20 h-20 rounded-full border-2 border-white shadow"
+          className="w-24 h-24 rounded-full border-2 border-white shadow"
         />
         <button
-          onClick={() => fileInputRef.current.click()}
+          onClick={() => fileRef.current.click()}
           className="absolute bottom-0 right-0 bg-orange p-1 rounded-full text-white"
-          title="تغيير الصورة"
         >
           <Camera size={16} />
         </button>
         <input
+          ref={fileRef}
           type="file"
           accept="image/*"
-          ref={fileInputRef}
-          onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0])}
+          onChange={e => e.target.files[0] && handleImageUpload(e.target.files[0])}
           className="hidden"
         />
-        {uploading && <p className="text-xs text-orange mt-2">جاري رفع الصورة...</p>}
+        {uploading && <p className="text-xs text-orange mt-2">جاري رفع الصورة…</p>}
       </div>
 
-      {/* النموذج */}
+      {/* نموذج البيانات */}
       <div className="space-y-4">
+        {/* الاسم */}
         <div>
           <label className="block mb-1 text-sm">الاسم</label>
           <input
-            type="text"
             name="name"
-            value={formData.name}
-            onChange={handleChange}
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             className="w-full px-4 py-2 rounded bg-white text-navy"
           />
         </div>
 
+        {/* اسم المستخدم */}
+        <div>
+          <label className="block mb-1 text-sm">اسم المستخدم</label>
+          <input
+            name="username"
+            value={form.username}
+            onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+            className="w-full px-4 py-2 rounded bg-white text-navy"
+          />
+        </div>
+
+        {/* البريد */}
         <div>
           <label className="block mb-1 text-sm">البريد الإلكتروني</label>
           <input
-            type="email"
             name="email"
-            value={formData.email}
-            onChange={handleChange}
+            type="email"
+            value={form.email}
+            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
             className="w-full px-4 py-2 rounded bg-white text-navy"
           />
         </div>
 
+        {/* كلمة المرور القديمة */}
+        <div>
+          <label className="block mb-1 text-sm">كلمة المرور القديمة</label>
+          <input
+            name="oldPassword"
+            type="password"
+            value={form.oldPassword}
+            onChange={e => setForm(f => ({ ...f, oldPassword: e.target.value }))}
+            placeholder="مطلوب لتغيير كلمة المرور"
+            className="w-full px-4 py-2 rounded bg-white text-navy"
+          />
+        </div>
+
+        {/* كلمة المرور الجديدة */}
         <div>
           <label className="block mb-1 text-sm">كلمة المرور الجديدة</label>
           <input
+            name="newPassword"
             type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
+            value={form.newPassword}
+            onChange={e => setForm(f => ({ ...f, newPassword: e.target.value }))}
             placeholder="اتركه فارغًا إذا لا تريد تغييره"
             className="w-full px-4 py-2 rounded bg-white text-navy"
           />
@@ -179,26 +211,20 @@ export default function ProfilePage() {
         {/* زر الحفظ */}
         <button
           onClick={() => setShowConfirm(true)}
-          className="w-full bg-orange py-2 rounded hover:bg-orange-600 transition text-white font-bold mt-4"
+          disabled={saving}
+          className="w-full bg-orange py-2 rounded hover:bg-orange-600 transition font-bold"
         >
-          حفظ التغييرات
+          {saving ? 'جاري الحفظ…' : '💾 حفظ التغييرات'}
         </button>
-
-        {/* رسالة النجاح */}
-        {successMsg && (
-          <div className="bg-green-500 text-white mt-4 py-2 px-4 rounded text-center">
-            {successMsg}
-          </div>
-        )}
       </div>
 
       {/* نافذة التأكيد */}
       {showConfirm && (
-        <div className="fixed inset-0 bg-[0,0,0,0.4]  flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
           <div className="bg-white text-navy p-6 rounded shadow-md w-80">
             <h2 className="text-lg font-bold mb-4">تأكيد الحفظ</h2>
-            <p className="mb-4">هل أنت متأكد أنك تريد حفظ التغييرات؟</p>
-            <div className="flex justify-end space-x-2">
+            <p className="mb-4">هل تريد حفظ كافة التغييرات الآن؟</p>
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowConfirm(false)}
                 className="px-4 py-1 bg-gray-300 rounded hover:bg-gray-400"
@@ -209,10 +235,17 @@ export default function ProfilePage() {
                 onClick={handleSave}
                 className="px-4 py-1 bg-orange text-white rounded hover:bg-orange-600"
               >
-                نعم، احفظ
+                نعم، حفظ
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50">
+          {toast}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useState, useRef, useEffect } from 'react';
-import { Home, Book, MessageCircle, BookPlus } from 'lucide-react';
+import { Home, Book, MessageCircle, BookPlus, UserCircle,PenTool } from 'lucide-react';
 
 export default function Navbar() {
   const { userData, signOut } = useAuth();
@@ -56,27 +56,21 @@ export default function Navbar() {
 
           {userData.role === 'teacher' && (
             <NavLink to="/managing-courses" className={linkClass}>
-              <BookPlus size={18} /> إدارة الدورات
+              <PenTool size={18} /> إدارة الدورات
             </NavLink>
           )}
 
           {userData.role === 'student' && (
-            <>
-              <NavLink to="/my-courses" className={linkClass}>
-                <Book size={18} /> دوراتي
-              </NavLink>
-            </>
+            <NavLink to="/my-courses" className={linkClass}>
+              <Book size={18} /> دوراتي
+            </NavLink>
           )}
         </div>
 
-        {/* صورة الملف الشخصي */}
+        {/* أيقونة الملف الشخصي */}
         <div className="relative" ref={dropdownRef}>
-          <button onClick={() => setDropdownOpen(!dropdownOpen)}>
-            <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=0D8ABC&color=fff`}
-              alt="profile"
-              className="w-10 h-10 rounded-full border-2 border-white shadow"
-            />
+          <button onClick={() => setDropdownOpen(!dropdownOpen)} aria-label="Profile">
+            <UserCircle className="w-10 h-10 text-white hover:text-orange transition" />
           </button>
 
           {dropdownOpen && (

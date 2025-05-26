@@ -29,7 +29,7 @@ export default function DashboardPage() {
           role: userData.role,
           email: user.email,
           username: userData.username || user.email.split('@')[0],
-          profile_image: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=0D8ABC&color=fff`
+          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=0D8ABC&color=fff`
         });
       }
     };

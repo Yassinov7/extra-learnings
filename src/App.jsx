@@ -15,12 +15,12 @@ import CourseResultsPage from './pages/CourseResultsPage';
 import NewChatPage from './pages/NewChatPage';
 import ChatListPage from './pages/ChatListPage';
 import ChatPage from './pages/ChatPage';
-import RedirectToLogin from './pages/RedirectToLogin';
+import RedirectToHome from './pages/RedirectToHome.jsx';
 import CourseManager from './pages/CourseManager.jsx';
 import CourseAdder from './pages/CourseAdder.jsx';
 import NotFound from './pages/NotFound.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
-
+import HomePage from './pages/HomePage.jsx'
 export default function App() {
   return (
     <AuthProvider> {/* ✅ غلّف كل شيء هنا */}
@@ -29,10 +29,11 @@ export default function App() {
         <Routes>
 
           {/* صفحات بدون تسجيل */}
-          <Route path="/" element={<RedirectToLogin />} />
+          <Route path="/" element={<RedirectToHome />} />
           <Route path="*" element={<NotFound />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/Home" element={<HomePage />} />
 
           {/* صفحات بعد تسجيل الدخول */}
           <Route element={<ProtectedLayout />}>
@@ -53,7 +54,7 @@ export default function App() {
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
 
-          <Route path="*" element={<CoursesPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
