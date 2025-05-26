@@ -18,6 +18,7 @@ import ChatPage from './pages/ChatPage';
 import RedirectToLogin from './pages/RedirectToLogin';
 import CourseManager from './pages/CourseManager.jsx';
 import CourseAdder from './pages/CourseAdder.jsx';
+import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
 
           {/* صفحات بدون تسجيل */}
           <Route path="/" element={<RedirectToLogin />} />
+          <Route path="*" element={<NotFound />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 

@@ -1,12 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Home, Book, MessageCircle, BookPlus } from 'lucide-react';
 
 export default function Navbar() {
   const { userData, signOut } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   if (!userData) return null;
 
@@ -15,113 +16,96 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  const toggleMenu = () => {
-    setMenuOpen(!menuOpen);
-  };
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const linkClass = ({ isActive }) =>
-    `hover:text-orange transition block px-2 py-1 ${
+    `hover:text-orange transition flex items-center gap-2 px-2 py-1 ${
       isActive ? 'text-orange font-bold' : ''
     }`;
 
   return (
-    <nav className="bg-navy text-white px-4 py-3 font-noto shadow-md">
+    <nav className="bg-navy text-white px-4 py-3 font-noto shadow-md fixed top-0 w-full z-50">
       <div className="flex justify-between items-center max-w-6xl mx-auto">
+
         {/* اسم المنصة */}
         <div className="text-lg md:text-xl font-bold text-orange">
-          Extra Learning | اكسترا للتعليم
+          Extra Learning
         </div>
 
-        {/* Toggle Menu - Mobile */}
-        <div className="md:hidden">
-          <button onClick={toggleMenu} className="text-white">
-            {menuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-
-        {/* روابط - Desktop */}
+        {/* روابط في الشاشات الكبيرة فقط */}
         <div className="hidden md:flex items-center space-x-4 text-sm">
+          <NavLink to="/" className={linkClass}>
+            <Home size={18} /> الصفحة الرئيسية
+          </NavLink>
+
           <NavLink to="/courses" className={linkClass}>
-            الدورات
+            <BookPlus size={18} /> الدورات
+          </NavLink>
+
+          <NavLink to="/chats" className={linkClass}>
+            <MessageCircle size={18} /> المحادثات
           </NavLink>
 
           {userData.role === 'teacher' && (
             <NavLink to="/managing-courses" className={linkClass}>
-              إدارة الدورات
+              <BookPlus size={18} /> إدارة الدورات
             </NavLink>
           )}
 
           {userData.role === 'student' && (
             <>
               <NavLink to="/my-courses" className={linkClass}>
-                📘 دوراتي
-              </NavLink>
-              <NavLink to="/my-results" className={linkClass}>
-                🏅 نتائجي
+                <Book size={18} /> دوراتي
               </NavLink>
             </>
           )}
+        </div>
 
-          <NavLink to="/chats" className={linkClass}>
-            💬 المحادثات
-          </NavLink>
-
-          <span className="text-gray-300">{userData.name}</span>
-
-          <button
-            onClick={handleLogout}
-            className="bg-orange text-white px-3 py-1 rounded hover:bg-orange-600 transition"
-          >
-            تسجيل الخروج
+        {/* صورة الملف الشخصي */}
+        <div className="relative" ref={dropdownRef}>
+          <button onClick={() => setDropdownOpen(!dropdownOpen)}>
+            <img
+              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=0D8ABC&color=fff`}
+              alt="profile"
+              className="w-10 h-10 rounded-full border-2 border-white shadow"
+            />
           </button>
+
+          {dropdownOpen && (
+            <div className="absolute left-0 mt-2 w-56 bg-white text-navy rounded-md shadow-lg z-50 p-4 text-sm">
+              <p className="font-bold text-base">{userData.name}</p>
+              <p className="text-xs text-gray-500 mb-3">{userData.email}</p>
+              <hr className="my-2" />
+
+              <NavLink
+                to="/profile"
+                onClick={() => setDropdownOpen(false)}
+                className="block mb-2 hover:text-orange"
+              >
+                تعديل الملف الشخصي
+              </NavLink>
+
+              <button
+                onClick={() => {
+                  setDropdownOpen(false);
+                  handleLogout();
+                }}
+                className="w-full text-right mt-1 text-red-600 hover:text-red-800"
+              >
+                تسجيل الخروج
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* روابط - Mobile */}
-      {menuOpen && (
-        <div className="md:hidden mt-3 space-y-2 text-sm text-right">
-          <NavLink to="/courses" className={linkClass} onClick={toggleMenu}>
-            📚 الدورات
-          </NavLink>
-
-          {userData.role === 'teacher' && (
-            <NavLink
-              to="/managing-courses"
-              className={linkClass}
-              onClick={toggleMenu}
-            >
-              🛠 إدارة الدورات
-            </NavLink>
-          )}
-
-          {userData.role === 'student' && (
-            <>
-              <NavLink to="/my-courses" className={linkClass} onClick={toggleMenu}>
-                📘 دوراتي
-              </NavLink>
-              <NavLink to="/my-results" className={linkClass} onClick={toggleMenu}>
-                🏅 نتائجي
-              </NavLink>
-            </>
-          )}
-
-          <NavLink to="/chats" className={linkClass} onClick={toggleMenu}>
-            💬 المحادثات
-          </NavLink>
-
-          <div className="px-2 text-gray-300">{userData.name}</div>
-
-          <button
-            onClick={() => {
-              toggleMenu();
-              handleLogout();
-            }}
-            className="w-full text-left px-2 py-1 text-white bg-orange rounded hover:bg-orange-600 transition"
-          >
-            تسجيل الخروج
-          </button>
-        </div>
-      )}
     </nav>
   );
 }
