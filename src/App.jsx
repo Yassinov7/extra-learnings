@@ -19,6 +19,7 @@ import RedirectToLogin from './pages/RedirectToLogin';
 import CourseManager from './pages/CourseManager.jsx';
 import CourseAdder from './pages/CourseAdder.jsx';
 import NotFound from './pages/NotFound.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/chats" element={<ChatListPage />} />
             <Route path="/chat/:receiverId" element={<ChatPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
 
           <Route path="*" element={<CoursesPage />} />

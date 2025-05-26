@@ -5,7 +5,7 @@ import { supabase } from '../api/supabase';
 import { BookOpen, MessageCircle, User, LayoutDashboard } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { user, userData, loading, signOut } = useAuth();
+  const { user, userData, loading, } = useAuth();
   const navigate = useNavigate();
   const [courseCount, setCourseCount] = useState(0);
 
@@ -73,7 +73,7 @@ export default function DashboardPage() {
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold mb-2">
-              👋 مرحباً {userData.name}!
+              👋 مرحباً <br />{userData.name}!
             </h1>
             <p className="text-lg">
               أنت معنا كـ{' '}
