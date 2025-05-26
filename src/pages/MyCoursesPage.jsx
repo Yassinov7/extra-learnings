@@ -7,14 +7,15 @@ export default function MyCoursesPage() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const fetchCourses = async () => {
-      const { data, error } = await supabase
+      
+
+      const response = await supabase
         .from('enrollments')
         .select(`
           course_id,
-          courses (
+          courses:course_id (
             course_id,
             title,
             description
@@ -22,14 +23,22 @@ export default function MyCoursesPage() {
         `)
         .eq('user_id', user.id);
 
-      if (!error && data) {
+      const { data, error } = response;
+
+      if (error) {
+        
+        setCourses([]);
+      } else {
+        
         setCourses(data.map(e => e.courses));
       }
 
       setLoading(false);
     };
 
-    if (user?.id) fetchCourses();
+    if (user?.id) {
+      fetchCourses();
+    }
   }, [user]);
 
   return (
