@@ -7,8 +7,11 @@ import sendSound from '../assets/send.mp3';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
+import calendar from 'dayjs/plugin/calendar';
+
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
+dayjs.extend(calendar);
 
 export default function ChatPage() {
   const { receiverId } = useParams();
@@ -20,11 +23,17 @@ export default function ChatPage() {
   const [playSend] = useSound(sendSound);
   const lastMessageRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const lastRealtimeUpdate = useRef(Date.now());
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const LIMIT = 20;
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
 
   const loadMessages = async (initial = false) => {
     const { data, error } = await supabase
@@ -39,10 +48,18 @@ export default function ChatPage() {
           (msg.sender_id === user.id && msg.receiver_id === receiverId) ||
           (msg.sender_id === receiverId && msg.receiver_id === user.id)
       );
-      if (initial) setMessages(filtered.slice(-LIMIT));
-      else setMessages(filtered);
-      setOffset(filtered.length - LIMIT);
-      setHasMore(filtered.length > LIMIT);
+      if (initial) {
+        setMessages(filtered.slice(-LIMIT));
+        setOffset(filtered.length - LIMIT);
+        setHasMore(filtered.length > LIMIT);
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      } else {
+        setMessages(filtered);
+        setOffset(filtered.length - LIMIT);
+        setHasMore(filtered.length > LIMIT);
+      }
       await markMessagesAsRead(filtered);
     }
   };
@@ -116,6 +133,9 @@ export default function ChatPage() {
       playSend();
       setText('');
       setMessages((prev) => [...prev, data]);
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     }
   };
 
@@ -146,7 +166,6 @@ export default function ChatPage() {
               const exists = prev.find((msg) => msg.chat_id === newMessage.chat_id);
               return exists ? prev : [...prev, newMessage];
             });
-            lastRealtimeUpdate.current = Date.now();
 
             if (
               newMessage.receiver_id === user.id &&
@@ -158,6 +177,12 @@ export default function ChatPage() {
                 .update({ is_read: true })
                 .eq('chat_id', newMessage.chat_id);
             }
+
+            if (!isUserScrolledUp) {
+              setTimeout(() => {
+                scrollToBottom();
+              }, 100);
+            }
           }
         }
       )
@@ -167,6 +192,21 @@ export default function ChatPage() {
       supabase.removeChannel(channel);
     };
   }, [user?.id, receiverId]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadMessages();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [user?.id, receiverId]);
+
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    if (scrollTop === 0) {
+      loadMoreMessages();
+    }
+    setIsUserScrolledUp(scrollTop + clientHeight < scrollHeight - 50);
+  };
 
   return (
     <div className="max-w-screen-sm mx-auto flex flex-col h-[calc(100vh-64px-80px)]">
@@ -187,42 +227,67 @@ export default function ChatPage() {
 
       <div
         ref={messagesContainerRef}
-        onScroll={(e) => {
-          if (e.target.scrollTop === 0) loadMoreMessages();
-        }}
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-2"
+        onScroll={handleScroll}
+        className="flex flex-col gap-2 overflow-y-auto h-[calc(100vh-8rem)] px-4 py-2"
       >
         {messages.map((msg, index) => {
           const isMe = msg.sender_id === user.id;
+          const isLast = index === messages.length - 1;
           const sentTime = dayjs(msg.sent_at).format('hh:mm A');
+
+          const currentDate = dayjs(msg.sent_at).startOf('day');
+          const prevDate = index > 0 ? dayjs(messages[index - 1].sent_at).startOf('day') : null;
+          const shouldShowDate = !prevDate || !currentDate.isSame(prevDate);
+
           return (
-            <div
-              key={msg.chat_id}
-              ref={index === messages.length - 1 ? lastMessageRef : null}
-              className={`p-3 rounded-xl max-w-[70%] break-words text-sm shadow 
-                ${isMe ? 'ml-auto bg-orange-500 text-white' : 'bg-white text-black'}`}
-            >
-              <div>{msg.message_text}</div>
-              <div className="text-xs mt-1 text-right">
-                {sentTime} {isMe && msg.is_read ? '✓✓' : ''}
+            <div key={msg.chat_id}>
+              {shouldShowDate && (
+                <div className="text-center my-2 text-xs text-gray-500">
+                  {currentDate.calendar(null, {
+                    sameDay: '[اليوم]',
+                    lastDay: '[أمس]',
+                    lastWeek: 'dddd',
+                    sameElse: 'DD MMM YYYY',
+                  })}
+                </div>
+              )}
+
+              <div
+                ref={isLast ? lastMessageRef : null}
+                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`
+                    relative px-4 py-2 rounded-2xl shadow-sm text-sm max-w-[75%]
+                    ${isMe
+                      ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-br-sm'
+                      : 'bg-gray-200 text-black rounded-bl-sm'}
+                  `}
+                >
+                  <div>{msg.message_text}</div>
+                  <div className={`mt-1 text-[11px] flex justify-between ${isMe ? 'text-white/80' : 'text-gray-600'}`}>
+                                        <span>{sentTime}</span>
+                    {isMe && msg.is_read && <span className="ml-2">✓✓</span>}
+                  </div>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="sticky bottom-0 bg-navy px-4 py-3 border-t border-white/10">
+      <div className="sticky bottom-0 bg-navy px-4 py-3 border-t border-white/10 w-full">
         <div className="flex gap-2">
           <input
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="اكتب رسالتك..."
-            className="flex-1 px-4 py-2 rounded-full border bg-white text-black placeholder:text-gray-500"
+            className="flex-1 px-4 py-2 rounded-full border bg-white text-black placeholder:text-gray-500 min-w-0 text-sm sm:text-base"
           />
           <button
             onClick={sendMessage}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full text-sm sm:text-base"
           >
             إرسال
           </button>

@@ -156,13 +156,13 @@ export default function ContentForm({ courseId, onAdded }) {
             >➕ جديد</button>
           </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex gap-2  min-w-0">
             <input
               type="text"
               value={newSectionTitle}
               onChange={e => setNewSectionTitle(e.target.value)}
               placeholder="عنوان القسم الجديد"
-              className="flex-grow border rounded px-4 py-2"
+              className="flex-grow border  min-w-0 rounded px-4 py-2"
             />
             <button
               type="button"

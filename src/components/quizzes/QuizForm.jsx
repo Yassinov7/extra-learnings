@@ -95,7 +95,7 @@ export default function QuizForm({ courseId, onAdded }) {
               value={newSectionTitle}
               onChange={(e) => setNewSectionTitle(e.target.value)}
               placeholder="عنوان القسم الجديد"
-              className="flex-grow border rounded px-4 py-2"
+              className="flex-grow  min-w-0 border rounded px-4 py-2"
             />
             <button
               type="button"
