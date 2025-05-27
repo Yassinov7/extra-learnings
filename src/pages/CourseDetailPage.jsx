@@ -1,46 +1,64 @@
+// src/pages/CourseDetailPage.jsx
+
 import { useParams, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../api/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import ContentForm from '../components/courses/ContentForm';
-import useProgress from '../hooks/useProgress';
 import QuizForm from '../components/quizzes/QuizForm';
+import ContentItem from '../components/courses/ContentItem';
+import useProgress from '../hooks/useProgress';
 
 export default function CourseDetailPage() {
   const { id } = useParams();
   const { user, userData } = useAuth();
 
   const [course, setCourse] = useState(null);
+  const [coverUrl, setCoverUrl] = useState('');
+  const [sections, setSections] = useState([]);
   const [contents, setContents] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolled, setEnrolled] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
 
-  useProgress(user?.id, course?.course_id); // Triggers progress calculation
+  const [activeSection, setActiveSection] = useState(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
-  // Fetch course data
+  useProgress(user?.id, course?.course_id);
+
+  // جلب البيانات الأساسية
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
         .eq('course_id', id)
         .single();
-
       setCourse(courseData);
+      setCoverUrl(courseData.cover_url || '/assets/images/react.js.png');
 
-      const { data: contentData } = await supabase
+      const { data: secs } = await supabase
+        .from('sections')
+        .select('*')
+        .eq('course_id', id)
+        .order('order_number', { ascending: true });
+      setSections(secs || []);
+      if (secs?.length) setActiveSection(secs[0].section_id);
+
+      const { data: conts } = await supabase
         .from('contents')
         .select('*')
         .eq('course_id', id);
-      setContents(contentData || []);
+      setContents(conts || []);
 
-      const { data: quizData } = await supabase
+      const { data: qs } = await supabase
         .from('quizzes')
         .select('*')
         .eq('course_id', id);
-      setQuizzes(quizData || []);
+      setQuizzes(qs || []);
 
       setLoading(false);
     };
@@ -48,162 +66,235 @@ export default function CourseDetailPage() {
     fetchData();
   }, [id]);
 
-  // Check enrollment
+  // تحقق التسجيل
   useEffect(() => {
-    const checkEnrollment = async () => {
-      if (!user || !id) return;
-
-      const { data } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('course_id', id)
-        .maybeSingle();
-
-      if (data) setEnrolled(true);
-    };
-
-    checkEnrollment();
+    if (!user) return;
+    supabase
+      .from('enrollments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('course_id', id)
+      .maybeSingle()
+      .then(({ data }) => setEnrolled(!!data));
   }, [user, id]);
 
-  // Fetch progress
+  // جلب نسبة التقدم
   useEffect(() => {
-    const fetchProgress = async () => {
-      const { data } = await supabase
-        .from('progress')
-        .select('percent_complete')
-        .eq('user_id', user?.id)
-        .eq('course_id', id)
-        .maybeSingle();
-
-      if (data) setProgressPercent(data.percent_complete);
-    };
-
-    if (enrolled) fetchProgress();
+    if (!enrolled) return;
+    supabase
+      .from('progress')
+      .select('percent_complete')
+      .eq('user_id', user.id)
+      .eq('course_id', id)
+      .maybeSingle()
+      .then(({ data }) => data && setProgressPercent(data.percent_complete));
   }, [enrolled, user, id]);
 
-  // Log content view
+  // تسجيل عرض محتوى
   const logView = async (contentId) => {
     if (!user) return;
     await supabase.from('content_views').upsert({
       user_id: user.id,
       course_id: id,
-      content_id: contentId,
+      content_id,
     }, { onConflict: ['user_id', 'content_id'] });
   };
 
+  // انضمام الطالب
   const handleEnroll = async () => {
     const { error } = await supabase.from('enrollments').insert({
       user_id: user.id,
       course_id: id,
     });
-
     if (!error) setEnrolled(true);
-    else alert('حدث خطأ أثناء الانضمام: ' + error.message);
+  };
+
+  // تغيير غلاف الدورة
+  const handleCoverChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingCover(true);
+    const ext = file.name.split('.').pop();
+    const fileName = `cover_${id}.${ext}`;
+    const filePath = `cover_image/${fileName}`;
+
+    // رفع الملف في البكيت course-content تحت المجلد cover_image
+    const { error: upErr } = await supabase
+      .storage
+      .from('course-content')
+      .upload(filePath, file, { upsert: true });
+
+    if (upErr) {
+      alert('خطأ برفع الصورة: ' + upErr.message);
+      setUploadingCover(false);
+      return;
+    }
+
+    // جلب الرابط العام
+    const { data: urlData } = supabase
+      .storage
+      .from('course-content')
+      .getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
+
+    // تحديث حقل cover_url في جدول courses
+    const { error: updateErr } = await supabase
+      .from('courses')
+      .update({ cover_url: publicUrl })
+      .eq('course_id', id);
+
+    if (updateErr) {
+      alert('خطأ بتحديث غلاف الدورة: ' + updateErr.message);
+    } else {
+      setCoverUrl(publicUrl);
+    }
+    setUploadingCover(false);
   };
 
   if (loading || !course) {
     return (
-      <div className="min-h-screen bg-navy text-white flex justify-center items-center">
-        <p className="text-lg font-noto">جارٍ تحميل الدورة...</p>
+      <div className="min-h-screen bg-navy text-white flex items-center justify-center">
+        <p className="font-noto text-lg">جارٍ التحميل...</p>
       </div>
     );
   }
 
+  const sectionContents = contents.filter(c => c.section_id === activeSection);
+
   return (
-    <>
-      {/* Progress bar */}
-      {userData?.role === 'student' && (
-        <div className="mb-4 px-6">
-          <label className="block mb-1">نسبة التقدّم:</label>
-          <div className="w-full bg-gray-300 rounded h-4 overflow-hidden">
-            <div
-              className="bg-orange h-4 transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            ></div>
-          </div>
-          <p className="text-sm mt-1 text-white">{progressPercent.toFixed(2)}%</p>
+    <div className="min-h-screen bg-navy text-white p-6 font-noto">
+      {/* غلاف الدورة */}
+      <div className="w-full h-48 md:h-64 lg:h-80 mb-4 overflow-hidden rounded-lg shadow-lg">
+        <img
+          src={coverUrl}
+          alt={`غلاف ${course.title}`}
+          className="w-full h-full object-cover"
+          onError={e => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = '/assets/images/react.js.png';
+          }}
+        />
+      </div>
+
+      {/* زر تغيير الغلاف (للمعلم فقط) */}
+      {userData?.role === 'teacher' && user.id === course.created_by && (
+        <div className="mb-6">
+          <label className="inline-block bg-gray-800 text-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-700 transition">
+            {uploadingCover ? 'جاري الرفع...' : 'تغيير الغلاف'}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleCoverChange}
+              className="hidden"
+              disabled={uploadingCover}
+            />
+          </label>
         </div>
       )}
 
-      <div className="min-h-screen bg-navy text-white p-6 font-noto">
-        <h1 className="text-2xl font-bold text-orange mb-2">{course.title}</h1>
-        <p className="mb-4">{course.description}</p>
+      {/* عنوان ووصف الدورة */}
+      <h1 className="text-3xl font-bold text-orange mb-2">{course.title}</h1>
+      <p className="mb-4">{course.description}</p>
 
-        {/* Enroll button */}
-        {userData?.role === 'student' && !enrolled && (
-          <button
-            onClick={handleEnroll}
-            className="bg-orange text-white px-4 py-2 rounded hover:bg-orange-600 transition mb-4"
-          >
-            انضمام للدورة
-          </button>
-        )}
+      {/* Progress bar */}
+      {userData?.role === 'student' && enrolled && (
+        <div className="mb-6">
+          <label className="block mb-1">نسبة التقدّم:</label>
+          <div className="w-full bg-gray-300 rounded h-4 overflow-hidden">
+            <div
+              className="bg-orange h-4 transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <p className="text-sm mt-1">{progressPercent.toFixed(2)}%</p>
+        </div>
+      )}
 
-        {/* Teacher tools */}
-        {userData?.role === 'teacher' && user.id === course.created_by && (
-          <>
-            <ContentForm courseId={id} onAdded={() => window.location.reload()} />
-            <QuizForm courseId={id} onAdded={() => window.location.reload()} />
-          </>
-        )}
+      {/* Enroll button */}
+      {userData?.role === 'student' && !enrolled && (
+        <button
+          onClick={handleEnroll}
+          className="bg-orange px-4 py-2 rounded hover:bg-orange-600 transition mb-6"
+        >
+          انضمام للدورة
+        </button>
+      )}
 
-        {/* Content */}
-        <h2 className="text-xl mt-6 mb-2 text-white border-b border-white pb-1">المحتوى</h2>
-        {contents.length === 0 ? (
-          <p className="text-gray-300">لا يوجد محتوى بعد.</p>
-        ) : (
-          <ul className="list-disc pl-6 text-sm">
-            {contents.map((item) => (
-              <div key={item.content_id} className="mb-6">
-                {item.type === 'video' ? (
-                  <video
-                    controls
-                    className="w-full rounded-lg shadow"
-                    onPlay={() => logView(item.content_id)}
-                  >
-                    <source src={item.url} type="video/mp4" />
-                    المتصفح لا يدعم تشغيل الفيديو
-                  </video>
-                ) : (
-                  <iframe
-                    src={item.url}
-                    className="w-full h-96 rounded-lg shadow"
-                    onLoad={() => logView(item.content_id)}
-                    title="Document Viewer"
-                  />
-                )}
-              </div>
+      {/* Teacher tools */}
+      {userData?.role === 'teacher' && user.id === course.created_by && (
+        <div className="space-y-4 mb-6">
+          <ContentForm courseId={id} onAdded={() => window.location.reload()} />
+          <QuizForm   courseId={id} onAdded={() => window.location.reload()} />
+        </div>
+      )}
+
+      {/* Section Tabs */}
+      <div className="overflow-x-auto mb-4">
+        <div className="inline-flex space-x-2">
+          {sections.map(sec => (
+            <button
+              key={sec.section_id}
+              onClick={() => setActiveSection(sec.section_id)}
+              className={`px-4 py-2 rounded-t-lg ${
+                activeSection === sec.section_id
+                  ? 'bg-white text-navy font-semibold'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              {sec.title}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* TOC */}
+      {sectionContents.length > 0 && (
+        <nav className="mb-6 bg-gray-800 p-4 rounded">
+          <h4 className="text-lg font-semibold mb-2">جدول المحتويات</h4>
+          <ul className="space-y-1">
+            {sectionContents.map(item => (
+              <li key={item.content_id}>
+                <a
+                  href={`#content-${item.content_id}`}
+                  className="text-orange hover:underline"
+                >
+                  {item.title}
+                </a>
+              </li>
             ))}
           </ul>
-        )}
+        </nav>
+      )}
 
-        {/* Quizzes */}
-        <h2 className="text-xl mt-6 mb-2 text-white border-b border-white pb-1">الاختبارات</h2>
-        {userData?.role === 'teacher' && user.id === course.created_by && (
-          <Link
-            to={`/courses/${id}/results`}
-            className="inline-block mt-4 my-3 bg-orange text-white px-4 py-2 rounded hover:bg-orange-600 transition"
-          >
-            📊 لوحة نتائج الدورة
-          </Link>
-        )}
-        {quizzes.length === 0 ? (
-          <p className="text-gray-300">لا توجد اختبارات بعد.</p>
+      {/* Accordion Content */}
+      {sectionContents.length === 0 ? (
+        <p className="text-gray-300">لا يوجد محتوى في هذا القسم.</p>
+      ) : (
+        sectionContents.map(item => (
+          <ContentItem key={item.content_id} item={item} onView={logView} />
+        ))
+      )}
+
+      {/* Quizzes */}
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold mb-2">الاختبارات</h2>
+        {quizzes.filter(q => q.section_id === activeSection).length === 0 ? (
+          <p className="text-gray-300">لا توجد اختبارات في هذا القسم.</p>
         ) : (
-          <div className="space-y-2">
-            {quizzes.map((quiz) => (
+          quizzes
+            .filter(q => q.section_id === activeSection)
+            .map(quiz => (
               <Link
                 key={quiz.quiz_id}
                 to={`/quizzes/${quiz.quiz_id}`}
-                className="block bg-white text-navy px-4 py-2 rounded shadow hover:bg-orange hover:text-white transition"
+                className="block bg-white text-navy px-4 py-2 rounded mb-2 shadow hover:bg-orange hover:text-white transition"
               >
                 📄 {quiz.title}
               </Link>
-            ))}
-          </div>
+            ))
         )}
       </div>
-    </>
+    </div>
   );
 }

@@ -220,7 +220,7 @@ export default function ProfilePage() {
 
       {/* نافذة التأكيد */}
       {showConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.5)] flex items-center justify-center z-50">
           <div className="bg-white text-navy p-6 rounded shadow-md w-80">
             <h2 className="text-lg font-bold mb-4">تأكيد الحفظ</h2>
             <p className="mb-4">هل تريد حفظ كافة التغييرات الآن؟</p>

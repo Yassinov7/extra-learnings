@@ -13,70 +13,112 @@ export default function NewChatPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. جلب دورات المستخدم
-      const { data: myEnrolls, error: enrollErr } = await supabase
-        .from('enrollments')
-        .select('course_id')
-        .eq('user_id', user.id);
-      if (enrollErr || !myEnrolls) return console.error(enrollErr);
-      const myCourseIds = myEnrolls.map(e => e.course_id);
-
-      // 2. جلب بيانات الدورات
-      const { data: courseData, error: courseErr } = await supabase
-        .from('courses')
-        .select('course_id, title, created_by')
-        .in('course_id', myCourseIds);
-      if (courseErr || !courseData) return console.error(courseErr);
-      setCourses(courseData);
-
-      // 3. جلب كل الاشتراكات
-      const { data: allEnrolls, error: allErr } = await supabase
-        .from('enrollments')
-        .select('user_id, course_id')
-        .in('course_id', myCourseIds);
-      if (allErr || !allEnrolls) return console.error(allErr);
-      const otherEnrolls = allEnrolls.filter(e => e.user_id !== user.id);
-
-      // 4. جلب بيانات الطلاب
-      const studentIds = Array.from(new Set(otherEnrolls.map(e => e.user_id)));
-      const { data: students, error: stuErr } = await supabase
+      const { data: myProfile, error: profileErr } = await supabase
         .from('user_profiles')
-        .select('user_id, name, username, role')
-        .in('user_id', studentIds);
-      if (stuErr || !students) return console.error(stuErr);
-      const studentsWithCourses = students.map(st => {
-        const yourCourses = otherEnrolls
-          .filter(e => e.user_id === st.user_id)
-          .map(e => e.course_id);
-        return {
-          ...st,
-          courses: courseData.filter(c => yourCourses.includes(c.course_id)),
-        };
-      });
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      if (profileErr || !myProfile) return console.error(profileErr);
 
-      // 5. جلب بيانات المعلمين
-      const teacherIds = Array.from(new Set(
-        courseData.map(c => c.created_by).filter(id => id !== user.id)
-      ));
-      const { data: teachers, error: teaErr } = await supabase
-        .from('user_profiles')
-        .select('user_id, name, username, role')
-        .in('user_id', teacherIds);
-      if (teaErr || !teachers) return console.error(teaErr);
-      const teachersWithCourses = teachers.map(t => {
-        const yourCourse = courseData.find(c => c.created_by === t.user_id);
-        return {
-          ...t,
-          courses: yourCourse ? [yourCourse] : [],
-        };
-      });
+      const myRole = myProfile.role;
 
-      // 6. دمج وإزالة التكرار
-      const merged = [...studentsWithCourses, ...teachersWithCourses];
-      const unique = Array.from(
-        new Map(merged.map(u => [u.user_id, u])).values()
-      );
-      setSharedUsers(unique);
+      if (myRole === 'teacher') {
+        const { data: users, error: usersErr } = await supabase
+          .from('user_profiles')
+          .select('user_id, name, username, role')
+          .neq('user_id', user.id);
+        if (usersErr || !users) return console.error(usersErr);
+
+        const { data: allCourses, error: coursesErr } = await supabase
+          .from('courses')
+          .select('course_id, title, created_by');
+        if (coursesErr || !allCourses) return console.error(coursesErr);
+
+        const { data: allEnrollments, error: enrollErr } = await supabase
+          .from('enrollments')
+          .select('user_id, course_id');
+        if (enrollErr || !allEnrollments) return console.error(enrollErr);
+
+        const usersWithCourses = users.map(u => {
+          let userCourses = [];
+
+          if (u.role === 'teacher') {
+            userCourses = allCourses.filter(c => c.created_by === u.user_id);
+          } else {
+            const enrolledIds = allEnrollments
+              .filter(e => e.user_id === u.user_id)
+              .map(e => e.course_id);
+            userCourses = allCourses.filter(c => enrolledIds.includes(c.course_id));
+          }
+
+          return {
+            ...u,
+            courses: userCourses,
+          };
+        });
+
+        setSharedUsers(usersWithCourses);
+        setCourses(allCourses);
+      } else {
+        const { data: myEnrolls, error: enrollErr } = await supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('user_id', user.id);
+        if (enrollErr || !myEnrolls) return console.error(enrollErr);
+        const myCourseIds = myEnrolls.map(e => e.course_id);
+
+        const { data: courseData, error: courseErr } = await supabase
+          .from('courses')
+          .select('course_id, title, created_by')
+          .in('course_id', myCourseIds);
+        if (courseErr || !courseData) return console.error(courseErr);
+        setCourses(courseData);
+
+        const { data: allEnrolls, error: allErr } = await supabase
+          .from('enrollments')
+          .select('user_id, course_id')
+          .in('course_id', myCourseIds);
+        if (allErr || !allEnrolls) return console.error(allErr);
+        const otherEnrolls = allEnrolls.filter(e => e.user_id !== user.id);
+
+        const studentIds = Array.from(new Set(otherEnrolls.map(e => e.user_id)));
+        const { data: students, error: stuErr } = await supabase
+          .from('user_profiles')
+          .select('user_id, name, username, role')
+          .in('user_id', studentIds);
+        if (stuErr || !students) return console.error(stuErr);
+        const studentsWithCourses = students.map(st => {
+          const yourCourses = otherEnrolls
+            .filter(e => e.user_id === st.user_id)
+            .map(e => e.course_id);
+          return {
+            ...st,
+            courses: courseData.filter(c => yourCourses.includes(c.course_id)),
+          };
+        });
+
+        const teacherIds = Array.from(new Set(
+          courseData.map(c => c.created_by).filter(id => id !== user.id)
+        ));
+        const { data: teachers, error: teaErr } = await supabase
+          .from('user_profiles')
+          .select('user_id, name, username, role')
+          .in('user_id', teacherIds);
+        if (teaErr || !teachers) return console.error(teaErr);
+        const teachersWithCourses = teachers.map(t => {
+          const yourCourses = courseData.filter(c => c.created_by === t.user_id);
+          return {
+            ...t,
+            courses: yourCourses,
+          };
+        });
+
+        const merged = [...studentsWithCourses, ...teachersWithCourses];
+        const unique = Array.from(
+          new Map(merged.map(u => [u.user_id, u])).values()
+        );
+        setSharedUsers(unique);
+      }
     };
 
     if (user?.id) fetchData();
@@ -101,11 +143,11 @@ export default function NewChatPage() {
       <h1 className="text-2xl font-bold mb-4">ابدأ محادثة جديدة</h1>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        {['all','teachers','students','byCourse'].map(tab => (
+        {['all', 'teachers', 'students', 'byCourse'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded ${activeTab===tab?'bg-orange':'bg-gray-700'}`}
+            className={`px-4 py-2 rounded ${activeTab === tab ? 'bg-orange' : 'bg-gray-700'}`}
           >
             {{
               all: 'الكل',
@@ -117,24 +159,24 @@ export default function NewChatPage() {
         ))}
       </div>
 
-      {activeTab==='byCourse' && (
+      {activeTab === 'byCourse' && (
         <select
           value={selectedCourse}
-          onChange={e=>setSelectedCourse(e.target.value)}
+          onChange={e => setSelectedCourse(e.target.value)}
           className="mb-6 p-2 bg-white text-black rounded"
         >
           <option value="">اختر دورة</option>
-          {courses.map(c=>(
+          {courses.map(c => (
             <option key={c.course_id} value={c.course_id}>{c.title}</option>
           ))}
         </select>
       )}
 
-      {filtered.length===0 ? (
-        <p>لا يوجد مستخدمون في هذا الدورة.</p>
+      {filtered.length === 0 ? (
+        <p>لا يوجد مستخدمون في هذا القسم.</p>
       ) : (
         <ul className="space-y-4">
-          {filtered.map(u=>(
+          {filtered.map(u => (
             <li key={u.user_id} className="bg-white text-black p-4 rounded shadow flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-xl text-gray-600">
@@ -143,22 +185,18 @@ export default function NewChatPage() {
                 <div>
                   <p className="font-bold">
                     {u.role === 'teacher'
-                      ? u.name      // teachers show name
-                      : u.username  // students show username
-                    }
+                      ? u.name
+                      : u.username}
                   </p>
-                  {u.courses.length>0 && (
+                  {u.courses?.length > 0 && (
                     <p className="text-sm text-gray-600 mt-1">
-                      {u.role==='teacher'
-                        ? u.courses[0].title
-                        : u.courses.map(c=>c.title).join('، ')
-                      }
+                      {u.courses.map(c => c.title).join('، ')}
                     </p>
                   )}
                 </div>
               </div>
               <button
-                onClick={()=>startChat(u.user_id)}
+                onClick={() => startChat(u.user_id)}
                 className="bg-orange px-4 py-2 rounded hover:bg-orange-600"
               >
                 ابدأ المحادثة

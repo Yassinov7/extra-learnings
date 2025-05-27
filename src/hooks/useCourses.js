@@ -11,7 +11,7 @@ export default function useCourses() {
       setLoading(true);
       const { data, error } = await supabase
         .from('courses')
-        .select('*')
+        .select('course_id, title, description, cover_url, created_at')
         .order('created_at', { ascending: false });
 
       if (error) setError(error.message);
