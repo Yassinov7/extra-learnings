@@ -1,13 +1,15 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useState, useRef, useEffect } from 'react';
-import { Home, Book, MessageCircle, BookPlus, UserCircle,PenTool } from 'lucide-react';
+import { Home, Book, MessageCircle, BookPlus, PenTool } from 'lucide-react';
+import useAvatarQuery from '../../hooks/useAvatarQuery';
 
 export default function Navbar() {
   const { userData, signOut } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const { avatarUrl } = useAvatarQuery(64);
 
   if (!userData) return null;
 
@@ -34,22 +36,17 @@ export default function Navbar() {
   return (
     <nav className="bg-navy text-white px-4 py-3 font-noto shadow-md fixed top-0 w-full z-50">
       <div className="flex justify-between items-center max-w-6xl mx-auto">
-
-        {/* اسم المنصة */}
         <div className="text-lg md:text-xl font-bold text-orange">
           Extra Learning
         </div>
 
-        {/* روابط في الشاشات الكبيرة فقط */}
         <div className="hidden md:flex items-center space-x-4 text-sm">
           <NavLink to="/" className={linkClass}>
             <Home size={18} /> الصفحة الرئيسية
           </NavLink>
-
           <NavLink to="/courses" className={linkClass}>
             <BookPlus size={18} /> الدورات
           </NavLink>
-
           <NavLink to="/chats" className={linkClass}>
             <MessageCircle size={18} /> المحادثات
           </NavLink>
@@ -67,10 +64,13 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* أيقونة الملف الشخصي */}
         <div className="relative" ref={dropdownRef}>
           <button onClick={() => setDropdownOpen(!dropdownOpen)} aria-label="Profile">
-            <UserCircle className="w-10 h-10 text-white hover:text-orange transition" />
+            <img
+              src={avatarUrl}
+              alt="Avatar"
+              className="w-10 h-10 rounded-full border-2 border-white hover:border-orange transition object-cover"
+            />
           </button>
 
           {dropdownOpen && (

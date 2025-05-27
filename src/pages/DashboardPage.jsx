@@ -2,16 +2,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../api/supabase';
-import { BookOpen, MessageCircle, User, LayoutDashboard } from 'lucide-react';
+import { BookOpen, MessageCircle, User } from 'lucide-react';
+import useAvatarQuery from '../hooks/useAvatarQuery';
 
 export default function DashboardPage() {
-  const { user, userData, loading, } = useAuth();
+  const { user, userData, loading } = useAuth();
   const navigate = useNavigate();
   const [courseCount, setCourseCount] = useState(0);
+  const { avatarUrl } = useAvatarQuery();
 
   useEffect(() => {
     if (!loading && !user) navigate('/login');
   }, [user, loading, navigate]);
+
   useEffect(() => {
     const insertProfile = async () => {
       if (!user || !userData) return;
@@ -67,8 +70,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-navy text-white font-noto">
-
-      {/* Hero Section */}
       <section className="bg-gradient-to-r from-orange to-yellow-500 p-6 text-navy">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
@@ -84,14 +85,13 @@ export default function DashboardPage() {
             </p>
           </div>
           <img
-            src={`https://ui-avatars.com/api/?name=${userData.name}&background=fff&color=0D3B66&size=128`}
+            src={avatarUrl}
             alt="Profile"
             className="w-24 h-24 rounded-full border-4 border-white shadow"
           />
         </div>
       </section>
 
-      {/* إحصائيات */}
       <section className="max-w-5xl mx-auto p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white text-navy p-5 rounded-lg shadow-md flex items-center gap-4">
           <BookOpen size={32} className="text-orange" />
@@ -118,7 +118,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* روابط سريعة */}
       <section className="max-w-5xl mx-auto px-6 pb-10">
         <h2 className="text-xl font-semibold mb-4 text-white">🚀 الوصول السريع</h2>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
