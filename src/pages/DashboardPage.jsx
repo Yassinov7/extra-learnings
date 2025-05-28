@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../api/supabase';
 import { BookOpen, MessageCircle, User } from 'lucide-react';
 import useAvatarQuery from '../hooks/useAvatarQuery';
+import { useUserProfileSync } from '../hooks/useUserProfileSync';
+
 
 export default function DashboardPage() {
   const { user, userData, loading } = useAuth();
@@ -11,41 +13,21 @@ export default function DashboardPage() {
   const [courseCount, setCourseCount] = useState(0);
   const { avatarUrl } = useAvatarQuery();
 
+  // استدعاء هوك مزامنة الملف الشخصي، ليجلب أو ينشئ الملف في قاعدة البيانات
+  const { profile, loading: profileLoading } = useUserProfileSync(user);
+
+  // توجيه المستخدم للصفحة تسجيل الدخول إن لم يكن مسجّل الدخول
   useEffect(() => {
     if (!loading && !user) navigate('/login');
   }, [user, loading, navigate]);
 
-  useEffect(() => {
-    const insertProfile = async () => {
-      if (!user || !userData) return;
-
-      const { data } = await supabase
-        .from('user_profiles')
-        .select('user_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!data) {
-        await supabase.from('user_profiles').insert({
-          user_id: user.id,
-          name: userData.name,
-          role: userData.role,
-          email: user.email,
-          username: userData.username || user.email.split('@')[0],
-          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=0D8ABC&color=fff`
-        });
-      }
-    };
-
-    insertProfile();
-  }, [user, userData]);
-
+  // جلب عدد الدورات أو التسجيلات بحسب دور المستخدم
   useEffect(() => {
     const fetchCourses = async () => {
-      if (!user || !userData) return;
+      if (!user || !profile) return;
 
-      const table = userData.role === 'teacher' ? 'courses' : 'enrollments';
-      const column = userData.role === 'teacher' ? 'created_by' : 'user_id';
+      const table = profile.role === 'teacher' ? 'courses' : 'enrollments';
+      const column = profile.role === 'teacher' ? 'created_by' : 'user_id';
 
       const { data, error } = await supabase
         .from(table)
@@ -58,9 +40,10 @@ export default function DashboardPage() {
     };
 
     fetchCourses();
-  }, [user, userData]);
+  }, [user, profile]);
 
-  if (loading || !userData) {
+  // عرض تحميل إذا كانت البيانات لا زالت تتحمل
+  if (loading || profileLoading || !profile) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-navy text-white font-noto">
         <p className="text-lg">جارٍ التحميل...</p>
@@ -74,18 +57,18 @@ export default function DashboardPage() {
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold mb-2">
-              👋 مرحباً <br />{userData.name}!
+              👋 مرحباً <br />{profile.name}!
             </h1>
             <p className="text-lg">
               أنت معنا كـ{' '}
               <span className="font-bold text-white">
-                {userData.role === 'teacher' ? 'معلم' : 'طالب'}
+                {profile.role === 'teacher' ? 'معلم' : 'طالب'}
               </span>
               ، نتمنى لك رحلة تعليمية مثمرة 🎯
             </p>
           </div>
           <img
-            src={avatarUrl}
+            src={avatarUrl || profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=0D8ABC&color=fff`}
             alt="Profile"
             className="w-24 h-24 rounded-full border-4 border-white shadow"
           />
@@ -121,7 +104,7 @@ export default function DashboardPage() {
       <section className="max-w-5xl mx-auto px-6 pb-10">
         <h2 className="text-xl font-semibold mb-4 text-white">🚀 الوصول السريع</h2>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {userData.role === 'student' && (
+          {profile.role === 'student' && (
             <>
               <Link to="/my-courses" className="bg-white text-navy px-5 py-2 rounded-lg shadow hover:bg-orange hover:text-white transition font-semibold">📘 دوراتي</Link>
               <Link to="/my-results" className="bg-white text-navy px-5 py-2 rounded-lg shadow hover:bg-orange hover:text-white transition font-semibold">🏅 نتائجي</Link>
@@ -129,7 +112,7 @@ export default function DashboardPage() {
             </>
           )}
 
-          {userData.role === 'teacher' && (
+          {profile.role === 'teacher' && (
             <>
               <Link to="/managing-courses" className="bg-white text-navy px-5 py-2 rounded-lg shadow hover:bg-orange hover:text-white transition font-semibold">🛠 إدارة الدورات</Link>
               <Link to="/courses" className="bg-white text-navy px-5 py-2 rounded-lg shadow hover:bg-orange hover:text-white transition font-semibold">📚 عرض الدورات</Link>

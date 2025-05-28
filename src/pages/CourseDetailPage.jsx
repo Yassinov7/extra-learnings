@@ -225,7 +225,7 @@ export default function CourseDetailPage() {
       {userData?.role === 'teacher' && user.id === course.created_by && (
         <div className="space-y-4 mb-6">
           <ContentForm courseId={id} onAdded={() => window.location.reload()} />
-          <QuizForm   courseId={id} onAdded={() => window.location.reload()} />
+          <QuizForm courseId={id} onAdded={() => window.location.reload()} />
         </div>
       )}
 
@@ -236,11 +236,10 @@ export default function CourseDetailPage() {
             <button
               key={sec.section_id}
               onClick={() => setActiveSection(sec.section_id)}
-              className={`px-4 py-2 rounded-t-lg ${
-                activeSection === sec.section_id
+              className={`px-4 py-2 rounded-t-lg ${activeSection === sec.section_id
                   ? 'bg-white text-navy font-semibold'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+                }`}
             >
               {sec.title}
             </button>
