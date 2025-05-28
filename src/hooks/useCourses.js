@@ -1,3 +1,4 @@
+// hooks/useCourses.js
 import { useEffect, useState } from 'react';
 import { supabase } from '../api/supabase';
 
@@ -11,7 +12,7 @@ export default function useCourses() {
       setLoading(true);
       const { data, error } = await supabase
         .from('courses')
-        .select('course_id, title, description, cover_url, created_at')
+        .select('course_id, title, description, cover_url, created_at, category_id')
         .order('created_at', { ascending: false });
 
       if (error) setError(error.message);

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-export default function CourseCard({ course }) {
+export default function CourseCard({ course, categoryName }) {
     const coverImage = course.cover_url || '/placeholder-image.jpg';
 
     return (
@@ -22,7 +22,8 @@ export default function CourseCard({ course }) {
             <div className="p-4 flex flex-col justify-between flex-grow font-noto text-right">
                 <div>
                     <h3 className="text-lg sm:text-xl font-bold text-navy mb-2">{course.title}</h3>
-                    <p className="text-gray-700 text-sm sm:text-base line-clamp-3 mb-4">{course.description}</p>
+                    <p className="text-sm mb-1 text-gray-900">التصنيف: <span className='text-orange'>{categoryName}</span></p>
+                    <p className="text-gray-600 text-sm sm:text-base line-clamp-3 mb-4">{course.description}</p>
                 </div>
 
                 <Link to={`/courses/${course.course_id}`} className="mt-auto">

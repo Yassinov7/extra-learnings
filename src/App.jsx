@@ -20,7 +20,8 @@ import CourseManager from './pages/CourseManager.jsx';
 import CourseAdder from './pages/CourseAdder.jsx';
 import NotFound from './pages/NotFound.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
-import HomePage from './pages/HomePage.jsx'
+import HomePage from './pages/HomePage.jsx';
+import CategoriesPage from './pages/CategoriesPage.jsx';
 export default function App() {
   return (
     <AuthProvider> {/* ✅ غلّف كل شيء هنا */}
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/chat/:receiverId" element={<ChatPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
