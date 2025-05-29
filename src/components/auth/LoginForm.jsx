@@ -71,13 +71,13 @@ export default function LoginForm() {
           <label className="block text-sm mb-1">كلمة المرور</label>
           <input
             type={showPassword ? 'text' : 'password'}
-            className="w-full pr-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             {...register('password')}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500 hover:text-orange-500"
+            className="absolute top-4/6  left-3 transform -translate-y-1/2 text-gray-500 hover:text-orange-500"
             tabIndex={-1}
             aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
           >

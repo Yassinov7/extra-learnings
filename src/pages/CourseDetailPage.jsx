@@ -115,42 +115,52 @@ export default function CourseDetailPage() {
     if (!file) return;
 
     setUploadingCover(true);
-    const ext = file.name.split('.').pop();
-    const fileName = `cover_${id}.${ext}`;
-    const filePath = `cover_image/${fileName}`;
 
-    // رفع الملف في البكيت course-content تحت المجلد cover_image
-    const { error: upErr } = await supabase
-      .storage
-      .from('course-content')
-      .upload(filePath, file, { upsert: true });
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `cover_${id}.${ext}`;
+      const filePath = `cover_image/${fileName}`;
 
-    if (upErr) {
-      alert('خطأ برفع الصورة: ' + upErr.message);
-      setUploadingCover(false);
-      return;
-    }
+      // رفع الملف
+      const { error: uploadError } = await supabase
+        .storage
+        .from('course-content')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type
+        });
 
-    // جلب الرابط العام
-    const { data: urlData } = supabase
-      .storage
-      .from('course-content')
-      .getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl;
+      if (uploadError) throw new Error(uploadError.message);
 
-    // تحديث حقل cover_url في جدول courses
-    const { error: updateErr } = await supabase
-      .from('courses')
-      .update({ cover_url: publicUrl })
-      .eq('course_id', id);
+      // جلب الرابط العام
+      const {
+        data: { publicUrl },
+        error: urlError
+      } = supabase
+        .storage
+        .from('course-content')
+        .getPublicUrl(filePath);
 
-    if (updateErr) {
-      alert('خطأ بتحديث غلاف الدورة: ' + updateErr.message);
-    } else {
+      if (urlError) throw new Error(urlError.message);
+
+      // تحديث غلاف الدورة
+      const { error: updateError } = await supabase
+        .from('courses')
+        .update({ cover_url: publicUrl })
+        .eq('course_id', id);
+
+      if (updateError) throw new Error(updateError.message);
+
+      // تحديث الحالة لعرض الغلاف الجديد
       setCoverUrl(publicUrl);
+    } catch (err) {
+      alert('حدث خطأ أثناء رفع الغلاف: ' + err.message);
+    } finally {
+      setUploadingCover(false);
     }
-    setUploadingCover(false);
   };
+
 
   if (loading || !course) {
     return (
@@ -165,16 +175,28 @@ export default function CourseDetailPage() {
   return (
     <div className="min-h-screen bg-navy text-white p-6 font-noto">
       {/* غلاف الدورة */}
-      <div className="w-full h-48 md:h-64 lg:h-80 mb-4 overflow-hidden rounded-lg shadow-lg">
-        <img
-          src={coverUrl}
-          alt={`غلاف ${course.title}`}
-          className="w-full h-full object-cover"
-          onError={e => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = '/assets/images/react.js.png';
-          }}
-        />
+      {/* غلاف الدورة مع aspect ratio وتضمين responsive */}
+      <div className="aspect-w-16 aspect-h-9 mb-4 rounded-lg shadow-lg overflow-hidden bg-gray-800">
+        <picture>
+          <source
+            media="(min-width:1024px)"
+            srcSet={`${coverUrl}?w=1200`}
+          />
+          <source
+            media="(min-width:640px)"
+            srcSet={`${coverUrl}?w=800`}
+          />
+          <img
+            src={`${coverUrl}?w=400`}
+            alt={`غلاف ${course.title}`}
+            className="w-full h-full object-contain"
+            loading="lazy"
+            onError={e => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/assets/images/react.js.png';
+            }}
+          />
+        </picture>
       </div>
 
       {/* زر تغيير الغلاف (للمعلم فقط) */}
@@ -237,8 +259,8 @@ export default function CourseDetailPage() {
               key={sec.section_id}
               onClick={() => setActiveSection(sec.section_id)}
               className={`px-4 py-2 rounded-t-lg ${activeSection === sec.section_id
-                  ? 'bg-white text-navy font-semibold'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-white text-navy font-semibold'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
             >
               {sec.title}
@@ -248,7 +270,7 @@ export default function CourseDetailPage() {
       </div>
 
       {/* TOC */}
-      {sectionContents.length > 0 && (
+      {/* {sectionContents.length > 0 && (
         <nav className="mb-6 bg-gray-800 p-4 rounded">
           <h4 className="text-lg font-semibold mb-2">جدول المحتويات</h4>
           <ul className="space-y-1">
@@ -264,14 +286,16 @@ export default function CourseDetailPage() {
             ))}
           </ul>
         </nav>
-      )}
+      )} */}
 
       {/* Accordion Content */}
+      <h4 className="text-lg font-semibold mb-2">المحتوى</h4>
       {sectionContents.length === 0 ? (
         <p className="text-gray-300">لا يوجد محتوى في هذا القسم.</p>
       ) : (
         sectionContents.map(item => (
           <ContentItem key={item.content_id} item={item} onView={logView} />
+
         ))
       )}
 
